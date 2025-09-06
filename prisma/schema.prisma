@@ -1,0 +1,184 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("homeowner") // homeowner, designer, contractor
+  avatar    String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects       Project[]
+  designs        Design[]
+  savedMaterials SavedMaterial[]
+
+  @@map("users")
+}
+
+model Project {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  budget      Float?
+  status      String   @default("planning") // planning, in_progress, completed, on_hold
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      Int
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rooms            Room[]
+  projectMaterials ProjectMaterial[]
+  designs          Design[]
+  progressItems    ProgressItem[]
+
+  @@map("projects")
+}
+
+model Room {
+  id          Int     @id @default(autoincrement())
+  name        String
+  type        String  // living_room, bedroom, kitchen, bathroom, etc.
+  length      Float?
+  width       Float?
+  height      Float?
+  area        Float?
+  imageUrl    String?
+  description String?
+  projectId   Int
+
+  project          Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  designs          Design[]
+  projectMaterials ProjectMaterial[]
+
+  @@map("rooms")
+}
+
+model MaterialCategory {
+  id          Int    @id @default(autoincrement())
+  name        String @unique
+  description String?
+  icon        String?
+
+  materials Material[]
+
+  @@map("material_categories")
+}
+
+model Material {
+  id           Int     @id @default(autoincrement())
+  name         String
+  description  String?
+  price        Float
+  unit         String  @default("piece") // piece, sqft, sqm, linear_ft, etc.
+  brand        String?
+  color        String?
+  finish       String?
+  material     String? // wood, ceramic, metal, etc.
+  imageUrl     String?
+  modelUrl     String? // for 3D models
+  categoryId   Int
+  availability Boolean @default(true)
+  rating       Float?
+  reviews      Int     @default(0)
+
+  category          MaterialCategory @relation(fields: [categoryId], references: [id])
+  projectMaterials  ProjectMaterial[]
+  savedMaterials    SavedMaterial[]
+  materialVariants  MaterialVariant[]
+
+  @@map("materials")
+}
+
+model MaterialVariant {
+  id         Int     @id @default(autoincrement())
+  color      String?
+  finish     String?
+  size       String?
+  price      Float?
+  imageUrl   String?
+  materialId Int
+
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@map("material_variants")
+}
+
+model ProjectMaterial {
+  id         Int     @id @default(autoincrement())
+  quantity   Float
+  unitCost   Float
+  totalCost  Float
+  status     String  @default("planned") // planned, ordered, delivered, installed
+  notes      String?
+  projectId  Int
+  materialId Int
+  roomId     Int?
+
+  project  Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id])
+  room     Room?    @relation(fields: [roomId], references: [id])
+
+  @@unique([projectId, materialId, roomId])
+  @@map("project_materials")
+}
+
+model SavedMaterial {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  materialId Int
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, materialId])
+  @@map("saved_materials")
+}
+
+model Design {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  configJson  String   // JSON configuration for 3D scene
+  previewUrl  String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  userId      Int
+  projectId   Int?
+  roomId      Int?
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  room    Room?    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@map("designs")
+}
+
+model ProgressItem {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  status      String   @default("pending") // pending, in_progress, completed
+  dueDate     DateTime?
+  completedAt DateTime?
+  priority    String   @default("medium") // low, medium, high
+  projectId   Int
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("progress_items")
+}
